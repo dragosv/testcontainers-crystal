@@ -1,0 +1,9 @@
+/docs/
+/lib/
+/bin/
+/.shards/
+*.dwarf
+/.idea/
+
+# Libraries don't need lockfile
+# shard.lock
