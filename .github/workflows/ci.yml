@@ -86,7 +86,7 @@ jobs:
   # Code coverage with kcov
   coverage:
     name: Code Coverage
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: build-and-test
     steps:
     - name: Checkout code
