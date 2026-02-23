@@ -216,7 +216,7 @@ module Testcontainers
       timeout : Float64 = 30.0,
       retries : Int32 = 3,
       shell : Bool = false,
-      start_period : Float64 = 0.0
+      start_period : Float64 = 0.0,
     ) : self
       test_arr = test.is_a?(String) ? test.split(" ") : test
       test_cmd = shell ? ["CMD-SHELL"] + test_arr : ["CMD"] + test_arr
@@ -276,7 +276,7 @@ module Testcontainers
       timeout : Int32 = 60,
       interval : Float64 = 0.5,
       status : Int32 = 200,
-      https : Bool = false
+      https : Bool = false,
     ) : self
       @wait_for = ->(container : DockerContainer) {
         container.wait_for_http(
@@ -663,7 +663,7 @@ module Testcontainers
       timeout : Int32 = 60,
       interval : Float64 = 0.5,
       status : Int32 = 200,
-      https : Bool = false
+      https : Bool = false,
     ) : Bool
       raise ContainerNotStartedError.new unless @container_id
 

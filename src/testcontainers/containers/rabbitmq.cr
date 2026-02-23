@@ -13,12 +13,12 @@ module Testcontainers
   # container.remove
   # ```
   class RabbitmqContainer < DockerContainer
-    RABBITMQ_DEFAULT_PORT       = 5672
-    RABBITMQ_MANAGEMENT_PORT    = 15672
-    RABBITMQ_DEFAULT_IMAGE      = "rabbitmq:management"
-    RABBITMQ_DEFAULT_USERNAME   = "guest"
-    RABBITMQ_DEFAULT_PASSWORD   = "guest"
-    RABBITMQ_DEFAULT_VHOST      = "/"
+    RABBITMQ_DEFAULT_PORT     =  5672
+    RABBITMQ_MANAGEMENT_PORT  = 15672
+    RABBITMQ_DEFAULT_IMAGE    = "rabbitmq:management"
+    RABBITMQ_DEFAULT_USERNAME = "guest"
+    RABBITMQ_DEFAULT_PASSWORD = "guest"
+    RABBITMQ_DEFAULT_VHOST    = "/"
 
     getter username : String
     getter password : String
@@ -28,7 +28,7 @@ module Testcontainers
       image : String = RABBITMQ_DEFAULT_IMAGE,
       @username : String = ENV.fetch("RABBITMQ_DEFAULT_USER", RABBITMQ_DEFAULT_USERNAME),
       @password : String = ENV.fetch("RABBITMQ_DEFAULT_PASS", RABBITMQ_DEFAULT_PASSWORD),
-      @vhost : String = ENV.fetch("RABBITMQ_DEFAULT_VHOST", RABBITMQ_DEFAULT_VHOST)
+      @vhost : String = ENV.fetch("RABBITMQ_DEFAULT_VHOST", RABBITMQ_DEFAULT_VHOST),
     )
       super(image)
       with_wait_for_logs(/Server startup complete/) unless wait_for_user_defined?
@@ -69,7 +69,7 @@ module Testcontainers
       protocol : String = "amqp",
       username : String? = nil,
       password : String? = nil,
-      vhost : String? = nil
+      vhost : String? = nil,
     ) : String
       user = username || @username
       pwd = password || @password

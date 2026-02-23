@@ -21,7 +21,7 @@ module Testcontainers
 
     def initialize(
       image : String = REDIS_DEFAULT_IMAGE,
-      @password : String? = nil
+      @password : String? = nil,
     )
       super(image)
       with_wait_for_logs(/Ready to accept connections/) unless wait_for_user_defined?

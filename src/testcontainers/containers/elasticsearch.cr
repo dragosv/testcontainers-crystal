@@ -13,15 +13,15 @@ module Testcontainers
   # container.remove
   # ```
   class ElasticsearchContainer < DockerContainer
-    ES_DEFAULT_PORT  = 9200
-    ES_DEFAULT_IMAGE = "elasticsearch:8.11.0"
+    ES_DEFAULT_PORT     = 9200
+    ES_DEFAULT_IMAGE    = "elasticsearch:8.11.0"
     ES_DEFAULT_PASSWORD = "test"
 
     getter password : String
 
     def initialize(
       image : String = ES_DEFAULT_IMAGE,
-      @password : String = ENV.fetch("ELASTIC_PASSWORD", ES_DEFAULT_PASSWORD)
+      @password : String = ENV.fetch("ELASTIC_PASSWORD", ES_DEFAULT_PASSWORD),
     )
       super(image)
       with_wait_for_http(

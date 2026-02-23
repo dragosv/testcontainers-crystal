@@ -16,3 +16,8 @@ dependencies:
   docr:
     github: marghidanu/docr
     version: "~> 0.1.4"
+
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
+    version: "~> 0.15.0"

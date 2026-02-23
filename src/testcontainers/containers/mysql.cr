@@ -30,7 +30,7 @@ module Testcontainers
       @root_password : String = ENV.fetch("MYSQL_ROOT_PASSWORD", MYSQL_DEFAULT_ROOT_PASSWORD),
       @username : String = ENV.fetch("MYSQL_USER", MYSQL_DEFAULT_USERNAME),
       @password : String = ENV.fetch("MYSQL_PASSWORD", MYSQL_DEFAULT_PASSWORD),
-      @database : String = ENV.fetch("MYSQL_DATABASE", MYSQL_DEFAULT_DATABASE)
+      @database : String = ENV.fetch("MYSQL_DATABASE", MYSQL_DEFAULT_DATABASE),
     )
       super(image)
       with_healthcheck(
@@ -85,7 +85,7 @@ module Testcontainers
       username : String? = nil,
       password : String? = nil,
       database : String? = nil,
-      options : Hash(String, String) = Hash(String, String).new
+      options : Hash(String, String) = Hash(String, String).new,
     ) : String
       db = database || @database
       user = username || @username

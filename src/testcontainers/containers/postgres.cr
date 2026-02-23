@@ -27,7 +27,7 @@ module Testcontainers
       image : String = POSTGRES_DEFAULT_IMAGE,
       @username : String = ENV.fetch("POSTGRES_USER", POSTGRES_DEFAULT_USERNAME),
       @password : String = ENV.fetch("POSTGRES_PASSWORD", POSTGRES_DEFAULT_PASSWORD),
-      @database : String = ENV.fetch("POSTGRES_DATABASE", POSTGRES_DEFAULT_DATABASE)
+      @database : String = ENV.fetch("POSTGRES_DATABASE", POSTGRES_DEFAULT_DATABASE),
     )
       super(image)
       with_healthcheck(
@@ -78,7 +78,7 @@ module Testcontainers
       username : String? = nil,
       password : String? = nil,
       database : String? = nil,
-      options : Hash(String, String) = Hash(String, String).new
+      options : Hash(String, String) = Hash(String, String).new,
     ) : String
       db = database || @database
       user = username || @username

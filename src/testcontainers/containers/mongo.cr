@@ -27,7 +27,7 @@ module Testcontainers
       image : String = MONGO_DEFAULT_IMAGE,
       @username : String? = nil,
       @password : String? = nil,
-      @database : String = ENV.fetch("MONGO_DATABASE", MONGO_DEFAULT_DATABASE)
+      @database : String = ENV.fetch("MONGO_DATABASE", MONGO_DEFAULT_DATABASE),
     )
       super(image)
       with_wait_for_logs(/Waiting for connections|ready for connections/) unless wait_for_user_defined?
@@ -64,7 +64,7 @@ module Testcontainers
       username : String? = nil,
       password : String? = nil,
       database : String? = nil,
-      options : Hash(String, String) = Hash(String, String).new
+      options : Hash(String, String) = Hash(String, String).new,
     ) : String
       user = username || @username
       pwd = password || @password

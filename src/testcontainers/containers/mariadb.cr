@@ -30,7 +30,7 @@ module Testcontainers
       @root_password : String = ENV.fetch("MARIADB_ROOT_PASSWORD", MARIADB_DEFAULT_ROOT_PASSWORD),
       @username : String = ENV.fetch("MARIADB_USER", MARIADB_DEFAULT_USERNAME),
       @password : String = ENV.fetch("MARIADB_PASSWORD", MARIADB_DEFAULT_PASSWORD),
-      @database : String = ENV.fetch("MARIADB_DATABASE", MARIADB_DEFAULT_DATABASE)
+      @database : String = ENV.fetch("MARIADB_DATABASE", MARIADB_DEFAULT_DATABASE),
     )
       super(image)
       with_healthcheck(
@@ -78,7 +78,7 @@ module Testcontainers
       username : String? = nil,
       password : String? = nil,
       database : String? = nil,
-      options : Hash(String, String) = Hash(String, String).new
+      options : Hash(String, String) = Hash(String, String).new,
     ) : String
       db = database || @database
       user = username || @username

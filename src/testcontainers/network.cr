@@ -22,7 +22,7 @@ module Testcontainers
 
     def initialize(
       @name : String = Network.generate_name,
-      @driver : String = DEFAULT_DRIVER
+      @driver : String = DEFAULT_DRIVER,
     )
       @network_id = nil
     end
