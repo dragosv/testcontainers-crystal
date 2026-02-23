@@ -9,80 +9,73 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
-    - name: Setup crystal
-      uses: crystal-actions/setup-crystal@v2
+    - name: Install Crystal
+      uses: crystal-lang/install-crystal@v1
       with:
-        crystal-version: '6.2'
+        crystal: 1.19.1
 
-    - name: Build release
-      run: crystal build --configuration release
+    - name: Install dependencies
+      run: shards install
+
+    - name: Check formatting
+      run: crystal tool format --check
+
+    - name: Build (type-check)
+      run: crystal build --no-codegen src/testcontainers.cr
 
     - name: Run tests
-      run: crystal test --configuration release
+      run: crystal spec --order random
 
-    - name: Generate documentation
-      run: |
-        crystal package --allow-writing-to-directory docs generate-documentation --target Testcontainers --output-path docs
-      continue-on-error: true
+    - name: Generate API docs
+      run: crystal docs
 
-    - name: Create release archive
+    - name: Extract version from shard.yml
+      id: version
       run: |
-        mkdir release
-        cp -r docs release/
-        cp Package.crystal release/
-        cp README.md release/
-        cp LICENSE release/
-        cd release && zip -r ../testcontainers-crystal-${{ github.ref_name }}.zip .
+        VERSION=$(grep '^version:' shard.yml | awk '{print $2}')
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        echo "Shard version: $VERSION"
+
+    - name: Verify tag matches shard version
+      run: |
+        TAG_VERSION="${{ github.ref_name }}"
+        TAG_VERSION="${TAG_VERSION#v}"
+        SHARD_VERSION="${{ steps.version.outputs.version }}"
+        if [ "$TAG_VERSION" != "$SHARD_VERSION" ]; then
+          echo "::error::Tag version ($TAG_VERSION) does not match shard.yml version ($SHARD_VERSION)"
+          exit 1
+        fi
 
     - name: Create GitHub Release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
+        tag_name: ${{ github.ref_name }}
+        name: Release ${{ github.ref_name }}
+        generate_release_notes: true
         body: |
-          ## Changes
-
-          See [CHANGELOG.md](CHANGELOG.md) for details.
-
           ## Installation
 
-          Add this package to your crystal Package Manager dependencies:
+          Add to your `shard.yml`:
 
-          ```crystal
-          .package(url: "https://github.com/${{ github.repository }}.git", from: "${{ github.ref_name }}")
+          ```yaml
+          dependencies:
+            testcontainers:
+              github: ${{ github.repository }}
+              version: "~> ${{ steps.version.outputs.version }}"
           ```
 
-          ## Documentation
+          Then run:
 
-          [📚 View Documentation](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/docs.zip)
+          ```bash
+          shards install
+          ```
         draft: false
         prerelease: false
-
-    - name: Upload release assets
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./testcontainers-crystal-${{ github.ref_name }}.zip
-        asset_name: testcontainers-crystal-${{ github.ref_name }}.zip
-        asset_content_type: application/zip
-
-    - name: Upload documentation
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./Docs.zip
-        asset_name: Docs-${{ github.ref_name }}.zip
-        asset_content_type: application/zip
-      if: success()

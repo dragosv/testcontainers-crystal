@@ -1,0 +1,213 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  # Build and test across multiple Crystal versions
+  build-and-test:
+    name: Build & Test (Crystal ${{ matrix.crystal }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            crystal: 1.19.1
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Crystal
+      uses: crystal-lang/install-crystal@v1
+      with:
+        crystal: ${{ matrix.crystal }}
+
+    - name: Cache shards
+      uses: actions/cache@v4
+      with:
+        path: |
+          lib
+          shard.lock
+        key: ${{ matrix.os }}-shards-${{ matrix.crystal }}-${{ hashFiles('shard.yml') }}
+        restore-keys: |
+          ${{ matrix.os }}-shards-${{ matrix.crystal }}-
+
+    - name: Install dependencies
+      run: shards install
+
+    - name: Check formatting
+      run: crystal tool format --check
+
+    - name: Build (type-check)
+      run: crystal build --no-codegen src/testcontainers.cr
+
+    - name: Run unit tests
+      run: crystal spec --order random
+
+  # Integration tests (require Docker)
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Crystal
+      uses: crystal-lang/install-crystal@v1
+      with:
+        crystal: 1.19.1
+
+    - name: Cache shards
+      uses: actions/cache@v4
+      with:
+        path: |
+          lib
+          shard.lock
+        key: ubuntu-latest-shards-latest-${{ hashFiles('shard.yml') }}
+        restore-keys: |
+          ubuntu-latest-shards-latest-
+
+    - name: Install dependencies
+      run: shards install
+
+    - name: Verify Docker is running
+      run: docker info
+
+    - name: Run integration tests
+      run: crystal spec -Dintegration --order random
+
+  # Code coverage with kcov
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Crystal
+      uses: crystal-lang/install-crystal@v1
+      with:
+        crystal: 1.19.1
+
+    - name: Cache shards
+      uses: actions/cache@v4
+      with:
+        path: |
+          lib
+          shard.lock
+        key: ubuntu-latest-shards-latest-${{ hashFiles('shard.yml') }}
+        restore-keys: |
+          ubuntu-latest-shards-latest-
+
+    - name: Install kcov dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y kcov
+
+    - name: Install dependencies
+      run: shards install
+
+    - name: Build spec binary
+      run: crystal build --debug -o bin/test_suite spec/docker_container_spec.cr spec/containers_spec.cr spec/network_spec.cr
+
+    - name: Run tests with kcov
+      run: |
+        mkdir -p coverage
+        kcov --clean \
+          --include-path=./src \
+          --exclude-pattern=/lib/,/spec/ \
+          coverage/ \
+          ./bin/test_suite
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        directory: coverage/
+        flags: unittests
+        name: testcontainers-crystal
+        fail_ci_if_error: false
+        verbose: true
+
+    - name: Upload coverage artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: coverage/
+        retention-days: 14
+
+  # Documentation generation
+  documentation:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Crystal
+      uses: crystal-lang/install-crystal@v1
+      with:
+        crystal: 1.19.1
+
+    - name: Cache shards
+      uses: actions/cache@v4
+      with:
+        path: |
+          lib
+          shard.lock
+        key: ubuntu-latest-shards-latest-${{ hashFiles('shard.yml') }}
+        restore-keys: |
+          ubuntu-latest-shards-latest-
+
+    - name: Install dependencies
+      run: shards install
+
+    - name: Check required files
+      run: |
+        for file in README.md LICENSE shard.yml; do
+          if [ ! -f "$file" ]; then
+            echo "::error::Missing required file: $file"
+            exit 1
+          fi
+        done
+
+    - name: Generate API docs
+      run: crystal docs
+
+    - name: Upload documentation
+      uses: actions/upload-artifact@v4
+      with:
+        name: api-docs
+        path: docs/
+        retention-days: 14
+
+  # Final status gate
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs: [build-and-test, integration-tests, coverage, documentation]
+    if: always()
+    steps:
+    - name: Check all jobs
+      run: |
+        if [[ "${{ needs.build-and-test.result }}" == "success" && \
+              "${{ needs.integration-tests.result }}" == "success" && \
+              "${{ needs.coverage.result }}" != "failure" && \
+              "${{ needs.documentation.result }}" != "failure" ]]; then
+          echo "All checks passed!"
+        else
+          echo "Some checks failed:"
+          echo "  build-and-test: ${{ needs.build-and-test.result }}"
+          echo "  integration-tests: ${{ needs.integration-tests.result }}"
+          echo "  coverage: ${{ needs.coverage.result }}"
+          echo "  documentation: ${{ needs.documentation.result }}"
+          exit 1
+        fi
