@@ -30,36 +30,28 @@ module Docr::Types
   end
 end
 
-# Monkey-patch for Docr::Client to support automatic reconnection.
+# Monkey-patch for Docr::Client to use a fresh socket per request.
 #
 # Crystal's HTTP::Client, when initialized with a custom IO (UNIXSocket),
-# sets @reconnect = false. If the underlying connection is closed (e.g. after
-# a streaming response drains the body in an ensure block), subsequent requests
-# fail with "This HTTP::Client cannot be reconnected".
+# sets @reconnect = false. After certain responses (e.g. Connection: close,
+# or when body_io cleanup runs in HTTP::Client's ensure block), the internal
+# @io is set to nil. Subsequent requests then fail with "This HTTP::Client
+# cannot be reconnected" since the client cannot re-establish the socket.
 #
-# This patch overrides `call` to catch that error and transparently create a
-# new UNIXSocket + HTTP::Client before retrying the request.
+# The original Docr::Client creates a single socket in initialize and reuses
+# it across all requests. This is unreliable over UNIX sockets where Docker
+# may close the connection at any time.
+#
+# Fix: create a fresh UNIXSocket + HTTP::Client for every API call. This
+# eliminates all connection state issues between requests. The overhead of
+# reconnecting a local UNIX socket per request is negligible for test usage.
 module Docr
   class Client
     def call(method : String, url : String | URI, headers : HTTP::Headers | Nil = nil, body : IO | Slice(UInt8) | String | Nil = nil, &)
-      @client.exec(method, url, headers, body) do |response|
-        unless response.success?
-          body_text = response.body_io?.try(&.gets_to_end) || "{\"message\": \"No response body\"}"
-          error = Docr::Types::ErrorResponse.from_json(body_text)
-          raise Docr::Errors::DockerAPIError.new(error.message, response.status_code)
-        end
-
-        yield response
-      end
-    rescue ex
-      raise ex unless ex.message.try(&.includes?("cannot be reconnected")) ||
-                      ex.message.try(&.includes?("Closed stream"))
-
-      # Transparently reconnect with a fresh socket
       socket = UNIXSocket.new("/var/run/docker.sock")
-      @client = HTTP::Client.new(socket)
+      client = HTTP::Client.new(socket)
 
-      @client.exec(method, url, headers, body) do |response|
+      client.exec(method, url, headers, body) do |response|
         unless response.success?
           body_text = response.body_io?.try(&.gets_to_end) || "{\"message\": \"No response body\"}"
           error = Docr::Types::ErrorResponse.from_json(body_text)
