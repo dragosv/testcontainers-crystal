@@ -330,6 +330,8 @@ module Testcontainers
         image_name = image_parts[0]
         image_tag = image_parts[1]? || "latest"
         api.images.create(image_name, tag: image_tag)
+      rescue JSON::SerializableError
+        # Image exists but response schema changed — no pull needed
       end
 
       # Create container configuration
