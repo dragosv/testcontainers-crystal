@@ -116,7 +116,9 @@ jobs:
       run: shards install
 
     - name: Build spec binary
-      run: crystal build --debug -o bin/test_suite spec/docker_container_spec.cr spec/containers_spec.cr spec/network_spec.cr
+      run: |
+        mkdir -p bin
+        crystal build --debug -o bin/test_suite spec/docker_container_spec.cr spec/containers_spec.cr spec/network_spec.cr
 
     - name: Run tests with kcov
       run: |

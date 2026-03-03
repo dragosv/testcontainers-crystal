@@ -13,6 +13,9 @@ description: |
   Docker containers for integration testing.
 
 dependencies:
+  http_client:
+    github: jgaskins/http_client
+
   docr:
     github: marghidanu/docr
     version: "~> 0.1.4"

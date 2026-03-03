@@ -8,7 +8,15 @@ shards:
     git: https://github.com/naqvis/crystar.git
     version: 0.4.0
 
+  db:
+    git: https://github.com/crystal-lang/crystal-db.git
+    version: 0.14.0
+
   docr:
     git: https://github.com/marghidanu/docr.git
     version: 0.1.4
+
+  http_client:
+    git: https://github.com/jgaskins/http_client.git
+    version: 0.1.0+git.commit.227739fe253bef4b7a71af5532fc35559cb4c5ab
 
