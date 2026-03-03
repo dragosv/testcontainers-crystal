@@ -80,7 +80,7 @@ module Docr
             raise ex
           end
         end
-      rescue ex
+      rescue ex : Exception
         # If the pool returns a broken connection or the connection drops during checkout, retry up to 3 times
         if (ex.is_a?(IO::Error) || ex.is_a?(Socket::Error) || ex.message == "This HTTP::Client cannot be reconnected") && retry_count < 3
           retry_count += 1
