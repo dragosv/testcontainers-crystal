@@ -59,6 +59,8 @@ module Docr
         end
 
         yield response
+      ensure
+        response.try(&.body_io?.try(&.gets_to_end))
       end
     end
   end
