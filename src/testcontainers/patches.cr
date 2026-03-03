@@ -41,6 +41,13 @@ end
 # connection setup overhead for every single request while ensuring resilience.
 require "http_client"
 
+# Monkey-patch to expose closed state for DB::Pool to properly evict HTTP::Client connections
+class HTTP::Client
+  def closed?
+    @io.nil?
+  end
+end
+
 module Docr
   class Client
     @@pool : HTTPClient::Client?
@@ -52,21 +59,33 @@ module Docr
     end
 
     def call(method : String, url : String | URI, headers : HTTP::Headers | Nil = nil, body : IO | Slice(UInt8) | String | Nil = nil, &)
-      self.class.pool.checkout do |client|
-        begin
-          client.exec(method, url, headers, body) do |response|
-            unless response.success?
-              body_text = response.body_io?.try(&.gets_to_end) || "{\"message\": \"No response body\"}"
-              error = Docr::Types::ErrorResponse.from_json(body_text)
-              raise Docr::Errors::DockerAPIError.new(error.message, response.status_code)
-            end
+      retry_count = 0
 
-            yield response
-          ensure
-            response.try(&.body_io?.try(&.skip_to_end))
+      begin
+        self.class.pool.checkout do |client|
+          begin
+            client.exec(method, url, headers, body) do |response|
+              unless response.success?
+                body_text = response.body_io?.try(&.gets_to_end) || "{\"message\": \"No response body\"}"
+                error = Docr::Types::ErrorResponse.from_json(body_text)
+                raise Docr::Errors::DockerAPIError.new(error.message, response.status_code)
+              end
+
+              yield response
+            ensure
+              response.try(&.body_io?.try(&.skip_to_end))
+            end
+          rescue ex
+            client.close
+            raise ex
           end
-        rescue ex
-          client.close
+        end
+      rescue ex
+        # If the pool returns a broken connection or the connection drops during checkout, retry up to 3 times
+        if (ex.is_a?(IO::Error) || ex.is_a?(Socket::Error) || ex.message == "This HTTP::Client cannot be reconnected") && retry_count < 3
+          retry_count += 1
+          retry
+        else
           raise ex
         end
       end
