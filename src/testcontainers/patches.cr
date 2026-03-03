@@ -53,16 +53,21 @@ module Docr
 
     def call(method : String, url : String | URI, headers : HTTP::Headers | Nil = nil, body : IO | Slice(UInt8) | String | Nil = nil, &)
       self.class.pool.checkout do |client|
-        client.exec(method, url, headers, body) do |response|
-          unless response.success?
-            body_text = response.body_io?.try(&.gets_to_end) || "{\"message\": \"No response body\"}"
-            error = Docr::Types::ErrorResponse.from_json(body_text)
-            raise Docr::Errors::DockerAPIError.new(error.message, response.status_code)
-          end
+        begin
+          client.exec(method, url, headers, body) do |response|
+            unless response.success?
+              body_text = response.body_io?.try(&.gets_to_end) || "{\"message\": \"No response body\"}"
+              error = Docr::Types::ErrorResponse.from_json(body_text)
+              raise Docr::Errors::DockerAPIError.new(error.message, response.status_code)
+            end
 
-          yield response
-        ensure
-          response.try(&.body_io?.try(&.gets_to_end))
+            yield response
+          ensure
+            response.try(&.body_io?.try(&.skip_to_end))
+          end
+        rescue ex
+          client.close
+          raise ex
         end
       end
     end
