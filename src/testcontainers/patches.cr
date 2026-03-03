@@ -30,37 +30,40 @@ module Docr::Types
   end
 end
 
-# Monkey-patch for Docr::Client to use a fresh socket per request.
+# Monkey-patch for Docr::Client to pool UNIX sockets via http_client.
 #
 # Crystal's HTTP::Client, when initialized with a custom IO (UNIXSocket),
-# sets @reconnect = false. After certain responses (e.g. Connection: close,
-# or when body_io cleanup runs in HTTP::Client's ensure block), the internal
-# @io is set to nil. Subsequent requests then fail with "This HTTP::Client
-# cannot be reconnected" since the client cannot re-establish the socket.
+# sets @reconnect = false. The original Docr::Client creates a single socket
+# and reuses it across all requests, which is unreliable when Docker drops
+# the connection.
 #
-# The original Docr::Client creates a single socket in initialize and reuses
-# it across all requests. This is unreliable over UNIX sockets where Docker
-# may close the connection at any time.
-#
-# Fix: create a fresh UNIXSocket + HTTP::Client for every API call. This
-# eliminates all connection state issues between requests. The overhead of
-# reconnecting a local UNIX socket per request is negligible for test usage.
+# Fix: use the `http_client` shard to handle a connection pool, avoiding
+# connection setup overhead for every single request while ensuring resilience.
+require "http_client"
+
 module Docr
   class Client
+    @@pool : HTTPClient::Client?
+
+    def self.pool
+      @@pool ||= HTTPClient.new(max_pool_size: 50, checkout_timeout: 10.seconds) do
+        HTTP::Client.new(UNIXSocket.new("/var/run/docker.sock"))
+      end
+    end
+
     def call(method : String, url : String | URI, headers : HTTP::Headers | Nil = nil, body : IO | Slice(UInt8) | String | Nil = nil, &)
-      socket = UNIXSocket.new("/var/run/docker.sock")
-      client = HTTP::Client.new(socket)
+      self.class.pool.checkout do |client|
+        client.exec(method, url, headers, body) do |response|
+          unless response.success?
+            body_text = response.body_io?.try(&.gets_to_end) || "{\"message\": \"No response body\"}"
+            error = Docr::Types::ErrorResponse.from_json(body_text)
+            raise Docr::Errors::DockerAPIError.new(error.message, response.status_code)
+          end
 
-      client.exec(method, url, headers, body) do |response|
-        unless response.success?
-          body_text = response.body_io?.try(&.gets_to_end) || "{\"message\": \"No response body\"}"
-          error = Docr::Types::ErrorResponse.from_json(body_text)
-          raise Docr::Errors::DockerAPIError.new(error.message, response.status_code)
+          yield response
+        ensure
+          response.try(&.body_io?.try(&.gets_to_end))
         end
-
-        yield response
-      ensure
-        response.try(&.body_io?.try(&.gets_to_end))
       end
     end
   end
