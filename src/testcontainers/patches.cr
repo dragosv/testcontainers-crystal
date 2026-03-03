@@ -75,8 +75,13 @@ module Docr
             ensure
               response.try(&.body_io?.try(&.skip_to_end))
             end
-          rescue ex
+          rescue ex : IO::Error | Socket::Error | DB::Error
             client.close
+            raise ex
+          rescue ex : Exception
+            if ex.message == "This HTTP::Client cannot be reconnected"
+              client.close
+            end
             raise ex
           end
         end
