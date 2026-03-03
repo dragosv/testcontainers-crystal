@@ -49,7 +49,7 @@ class HTTP::Client
 end
 
 module Docr
-  class Client
+  class PoolProxy
     @@pool : HTTPClient::Client?
 
     def self.pool
@@ -58,42 +58,41 @@ module Docr
       end
     end
 
-    def call(method : String, url : String | URI, headers : HTTP::Headers | Nil = nil, body : IO | Slice(UInt8) | String | Nil = nil, &)
+    def exec(method, url, headers, body, &)
       retry_count = 0
 
-      begin
-        self.class.pool.checkout do |client|
-          begin
-            client.exec(method, url, headers, body) do |response|
-              unless response.success?
-                body_text = response.body_io?.try(&.gets_to_end) || "{\"message\": \"No response body\"}"
-                error = Docr::Types::ErrorResponse.from_json(body_text)
-                raise Docr::Errors::DockerAPIError.new(error.message, response.status_code)
+      loop do
+        begin
+          return self.class.pool.checkout do |client|
+            begin
+              client.exec(method, url, headers, body) do |response|
+                yield response
               end
-
-              yield response
-            ensure
-              response.try(&.body_io?.try(&.skip_to_end))
-            end
-          rescue ex : IO::Error | Socket::Error | DB::Error
-            client.close
-            raise ex
-          rescue ex : Exception
-            if ex.message == "This HTTP::Client cannot be reconnected"
+            rescue ex : IO::Error | Socket::Error | DB::Error
               client.close
+              raise ex
+            rescue ex : Exception
+              if ex.message.try(&.includes?("This HTTP::Client cannot be reconnected"))
+                client.close
+              end
+              raise ex
             end
+          end
+        rescue ex : Exception
+          if (ex.is_a?(IO::Error) || ex.is_a?(Socket::Error) || ex.message.try(&.includes?("This HTTP::Client cannot be reconnected"))) && retry_count < 3
+            retry_count += 1
+            next
+          else
             raise ex
           end
         end
-      rescue ex : Exception
-        # If the pool returns a broken connection or the connection drops during checkout, retry up to 3 times
-        if (ex.is_a?(IO::Error) || ex.is_a?(Socket::Error) || ex.message == "This HTTP::Client cannot be reconnected") && retry_count < 3
-          retry_count += 1
-          retry
-        else
-          raise ex
-        end
       end
+    end
+  end
+
+  class Client
+    def initialize
+      @client = PoolProxy.new
     end
   end
 end
