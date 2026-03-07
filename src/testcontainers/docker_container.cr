@@ -710,10 +710,7 @@ module Testcontainers
     end
 
     private def default_labels : Hash(String, String)
-      {
-        "org.testcontainers.lang"    => "crystal",
-        "org.testcontainers.version" => Testcontainers::VERSION,
-      }
+      DockerClient.default_labels
     end
 
     private def normalize_port(port : Int32 | String) : String

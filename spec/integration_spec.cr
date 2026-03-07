@@ -103,6 +103,39 @@ require "./spec_helper"
         network.remove rescue nil
       end
     end
+
+    it "applies Testcontainers labels to container and network" do
+      network = Testcontainers::Network.new
+      container = Testcontainers::DockerContainer.new("redis:7-alpine")
+        .with_exposed_port(6379)
+
+      begin
+        network.create!
+        container.start
+
+        container_labels = container.info.config.labels
+        container_labels.should_not be_nil
+        container_labels = container_labels.not_nil!
+
+        network_labels = network.info.labels
+
+        container_labels["org.testcontainers"].should eq("true")
+        network_labels["org.testcontainers"].should eq("true")
+
+        container_labels["org.testcontainers.sessionId"].should eq(Testcontainers::DockerClient::SESSION_ID)
+        network_labels["org.testcontainers.sessionId"].should eq(Testcontainers::DockerClient::SESSION_ID)
+
+        container_labels["org.testcontainers.lang"].should eq("crystal")
+        network_labels["org.testcontainers.lang"].should eq("crystal")
+
+        container_labels["org.testcontainers.version"].should eq(Testcontainers::VERSION)
+        network_labels["org.testcontainers.version"].should eq(Testcontainers::VERSION)
+      ensure
+        container.stop rescue nil
+        container.remove(force: true) rescue nil
+        network.remove rescue nil
+      end
+    end
   end
 {% else %}
   describe "Integration tests" do

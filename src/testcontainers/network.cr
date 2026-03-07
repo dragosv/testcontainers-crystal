@@ -19,12 +19,14 @@ module Testcontainers
     getter name : String
     getter driver : String
     getter network_id : String?
+    getter labels : Hash(String, String)
 
     def initialize(
       @name : String = Network.generate_name,
       @driver : String = DEFAULT_DRIVER,
     )
       @network_id = nil
+      @labels = DockerClient.default_labels
     end
 
     # Creates the Docker network (idempotent).
@@ -35,6 +37,7 @@ module Testcontainers
         name: @name,
         driver: @driver,
         check_duplicate: true,
+        labels: @labels,
       )
 
       response = DockerClient.api.networks.create(config)
