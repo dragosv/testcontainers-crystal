@@ -22,6 +22,14 @@ describe Testcontainers::Network do
       network.created?.should be_false
       network.network_id.should be_nil
     end
+
+    it "sets default labels" do
+      network = Testcontainers::Network.new
+      network.labels["org.testcontainers"].should eq("true")
+      network.labels["org.testcontainers.sessionId"].should eq(Testcontainers::DockerClient::SESSION_ID)
+      network.labels["org.testcontainers.lang"].should eq("crystal")
+      network.labels["org.testcontainers.version"].should eq(Testcontainers::VERSION)
+    end
   end
 
   describe ".generate_name" do

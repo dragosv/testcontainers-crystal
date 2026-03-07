@@ -1,10 +1,18 @@
 require "docr"
+require "uuid"
 
 module Testcontainers
   # DockerClient provides a singleton-like access to the Docr API client
   # which communicates with the Docker daemon via the UNIX socket.
   module DockerClient
     @@api : Docr::API? = nil
+
+    TESTCONTAINERS_LABEL            = "org.testcontainers"
+    TESTCONTAINERS_SESSION_ID_LABEL = "#{TESTCONTAINERS_LABEL}.sessionId"
+    TESTCONTAINERS_LANG_LABEL       = "#{TESTCONTAINERS_LABEL}.lang"
+    TESTCONTAINERS_VERSION_LABEL    = "#{TESTCONTAINERS_LABEL}.version"
+
+    SESSION_ID = UUID.random.to_s
 
     # Returns the shared Docr::API instance, creating it if needed.
     #
@@ -20,6 +28,16 @@ module Testcontainers
     # Resets the cached API instance. Useful for testing.
     def self.reset!
       @@api = nil
+    end
+
+    # Returns the default marker labels applied to Testcontainers resources.
+    def self.default_labels : Hash(String, String)
+      {
+        TESTCONTAINERS_LABEL            => "true",
+        TESTCONTAINERS_SESSION_ID_LABEL => SESSION_ID,
+        TESTCONTAINERS_LANG_LABEL       => "crystal",
+        TESTCONTAINERS_VERSION_LABEL    => Testcontainers::VERSION,
+      }
     end
 
     # Returns the Docker host address.

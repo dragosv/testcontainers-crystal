@@ -9,8 +9,17 @@ describe Testcontainers::DockerContainer do
 
     it "sets default labels" do
       container = Testcontainers::DockerContainer.new("redis:latest")
+      container.labels["org.testcontainers"].should eq("true")
+      container.labels["org.testcontainers.sessionId"].should eq(Testcontainers::DockerClient::SESSION_ID)
       container.labels["org.testcontainers.lang"].should eq("crystal")
       container.labels["org.testcontainers.version"].should eq(Testcontainers::VERSION)
+    end
+
+    it "uses the same session id across containers" do
+      container_1 = Testcontainers::DockerContainer.new("redis:latest")
+      container_2 = Testcontainers::DockerContainer.new("nginx:latest")
+
+      container_1.labels["org.testcontainers.sessionId"].should eq(container_2.labels["org.testcontainers.sessionId"])
     end
 
     it "starts with empty configurations" do
