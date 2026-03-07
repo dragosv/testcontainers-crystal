@@ -87,7 +87,7 @@ module Testcontainers
       "#{protocol}://#{user}:#{pwd}@#{host}:#{mapped_port(port)}/#{db}#{query}"
     end
 
-    private def configure_env
+    private def configure_env : Nil
       with_env("POSTGRES_USER", @username)
       with_env("POSTGRES_PASSWORD", @password)
       with_env("POSTGRES_DB", @database)

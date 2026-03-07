@@ -689,23 +689,23 @@ module Testcontainers
 
     # ---- Private helpers ----
 
-    private def add_exposed_port(port : Int32 | String)
+    private def add_exposed_port(port : Int32 | String) : Nil
       normalized = normalize_port(port)
       @exposed_ports[normalized] = Hash(String, String).new
       @port_bindings[normalized] ||= [Docr::Types::PortBinding.new(host_ip: "", host_port: "")]
     end
 
-    private def add_fixed_exposed_port(container_port : Int32 | String, host_port : Int32)
+    private def add_fixed_exposed_port(container_port : Int32 | String, host_port : Int32) : Nil
       normalized = normalize_port(container_port)
       @exposed_ports[normalized] = Hash(String, String).new
       @port_bindings[normalized] = [Docr::Types::PortBinding.new(host_ip: "", host_port: host_port.to_s)]
     end
 
-    private def add_env(env_str : String)
+    private def add_env(env_str : String) : Nil
       @env << env_str
     end
 
-    private def add_labels(labels : Hash(String, String))
+    private def add_labels(labels : Hash(String, String)) : Nil
       @labels.merge!(labels)
     end
 

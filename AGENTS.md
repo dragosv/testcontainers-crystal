@@ -81,6 +81,7 @@ Dependencies are managed via `shard.yml`. Run `shards install` after changes.
 - Integration tests (behind `-Dintegration` flag) require Docker.
 - Always clean up containers in tests with `ensure` or equivalent.
 
+
 ## Additional Best Practices
 
 - Prefer explicit nil checks over `not_nil!`; avoid `as` casts in production paths.
@@ -88,3 +89,4 @@ Dependencies are managed via `shard.yml`. Run `shards install` after changes.
 - Use `begin/ensure` blocks for resource cleanup.
 - Keep Docker endpoint configuration centralized via `Testcontainers::DockerClient`.
 - When adding monkey-patches to `docr` types, isolate them in `patches.cr` with clear comments.
+- Use Nil return type annotations pattern  : Nil return types on methods that don't return meaningful values (e.g., def max_connections=(value : Int32) : Nil)
