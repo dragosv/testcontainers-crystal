@@ -23,6 +23,8 @@ module Testcontainers
   # container.remove
   # ```
   class DockerContainer
+    Log = Testcontainers::Log.for("container")
+
     # Container configuration properties
     property name : String?
     property image : String
@@ -325,7 +327,7 @@ module Testcontainers
       begin
         api.images.inspect(@image)
       rescue Docr::Errors::DockerAPIError
-        Testcontainers.logger.info { "Pulling image: #{@image}" }
+        Log.info { "Pulling image: #{@image}" }
         image_parts = @image.split(":")
         image_name = image_parts[0]
         image_tag = image_parts[1]? || "latest"
@@ -339,25 +341,26 @@ module Testcontainers
 
       # Create the container
       container_name = @name || "testcontainers-#{UUID.random}"
-      Testcontainers.logger.info { "Creating container from image: #{@image}" }
+      Log.info { "Creating container from image: #{@image}" }
 
       response = api.containers.create(container_name, config)
-      @container_id = response.id
+      id = response.id
+      @container_id = id
 
       # Start the container
-      Testcontainers.logger.info { "Starting container: #{@container_id}" }
-      api.containers.start(@container_id.not_nil!)
+      Log.info { "Starting container: #{id}" }
+      api.containers.start(id)
 
       # Fetch container details
-      inspect_data = api.containers.inspect(@container_id.not_nil!)
+      inspect_data = api.containers.inspect(id)
       @name = inspect_data.name.lstrip('/')
       @created_at = inspect_data.created
 
       # Execute wait strategy
       if wait_proc = @wait_for
-        Testcontainers.logger.info { "Waiting for container to be ready..." }
+        Log.info { "Waiting for container to be ready..." }
         wait_proc.call(self)
-        Testcontainers.logger.info { "Container is ready" }
+        Log.info { "Container is ready" }
       end
 
       self
@@ -377,12 +380,12 @@ module Testcontainers
 
     # Stops the container.
     def stop(force : Bool = false) : self
-      raise ContainerNotStartedError.new unless @container_id
-      Testcontainers.logger.info { "Stopping container: #{@container_id}" }
+      id = require_container_id
+      Log.info { "Stopping container: #{id}" }
       if force
-        api.containers.kill(@container_id.not_nil!)
+        api.containers.kill(id)
       else
-        api.containers.stop(@container_id.not_nil!)
+        api.containers.stop(id)
       end
       self
     rescue ex : Docr::Errors::DockerAPIError
@@ -396,8 +399,8 @@ module Testcontainers
 
     # Kills the container with the specified signal.
     def kill(signal : String = "SIGKILL") : self
-      raise ContainerNotStartedError.new unless @container_id
-      api.containers.kill(@container_id.not_nil!, signal)
+      id = require_container_id
+      api.containers.kill(id, signal)
       self
     rescue ex : Docr::Errors::DockerAPIError
       raise ConnectionError.new("Docker API error: #{ex.message}")
@@ -406,7 +409,7 @@ module Testcontainers
     # Removes/deletes the container.
     def remove(force : Bool = false, volumes : Bool = false) : self
       if id = @container_id
-        Testcontainers.logger.info { "Removing container: #{id}" }
+        Log.info { "Removing container: #{id}" }
         api.containers.delete(id, volumes: volumes, force: force)
         @container_id = nil
       end
@@ -422,8 +425,7 @@ module Testcontainers
 
     # Restarts the container.
     def restart : self
-      raise ContainerNotStartedError.new unless @container_id
-      api.containers.restart(@container_id.not_nil!)
+      api.containers.restart(require_container_id)
       self
     rescue ex : Docr::Errors::DockerAPIError
       raise ConnectionError.new("Docker API error: #{ex.message}")
@@ -431,8 +433,7 @@ module Testcontainers
 
     # Pauses the container.
     def pause : self
-      raise ContainerNotStartedError.new unless @container_id
-      api.containers.pause(@container_id.not_nil!)
+      api.containers.pause(require_container_id)
       self
     rescue ex : Docr::Errors::DockerAPIError
       raise ConnectionError.new("Docker API error: #{ex.message}")
@@ -440,8 +441,7 @@ module Testcontainers
 
     # Unpauses the container.
     def unpause : self
-      raise ContainerNotStartedError.new unless @container_id
-      api.containers.unpause(@container_id.not_nil!)
+      api.containers.unpause(require_container_id)
       self
     rescue ex : Docr::Errors::DockerAPIError
       raise ConnectionError.new("Docker API error: #{ex.message}")
@@ -449,11 +449,22 @@ module Testcontainers
 
     # ---- Container status methods ----
 
+    # Provides a concise string representation for debugging.
+    def inspect(io : IO) : Nil
+      io << "#<" << self.class << " image=" << @image
+      if id = @container_id
+        io << " id=" << id
+      end
+      if name = @name
+        io << " name=" << name
+      end
+      io << ">"
+    end
+
     # Returns the container's status string.
     # Possible values: "created", "running", "paused", "restarting", "removing", "exited", "dead"
     def status : String
-      raise ContainerNotStartedError.new unless @container_id
-      inspect_data = api.containers.inspect(@container_id.not_nil!)
+      inspect_data = api.containers.inspect(require_container_id)
       inspect_data.state.try(&.status) || "unknown"
     rescue ex : Docr::Errors::DockerAPIError
       raise ConnectionError.new("Docker API error: #{ex.message}")
@@ -462,7 +473,7 @@ module Testcontainers
     # Returns whether the container is running.
     def running? : Bool
       status == "running"
-    rescue ContainerNotStartedError
+    rescue NotStartedError
       false
     end
 
@@ -488,25 +499,24 @@ module Testcontainers
 
     # Returns whether the container is healthy.
     def healthy? : Bool
-      raise ContainerNotStartedError.new unless @container_id
+      id = require_container_id
       raise HealthcheckNotSupportedError.new unless supports_healthcheck?
-      inspect_data = api.containers.inspect(@container_id.not_nil!)
+      inspect_data = api.containers.inspect(id)
       inspect_data.state.try(&.health).try(&.status) == "healthy"
-    rescue ContainerNotStartedError
+    rescue NotStartedError
       false
     end
 
     # Returns whether the container supports healthchecks.
     def supports_healthcheck? : Bool
-      raise ContainerNotStartedError.new unless @container_id
-      inspect_data = api.containers.inspect(@container_id.not_nil!)
+      inspect_data = api.containers.inspect(require_container_id)
       !inspect_data.config.healthcheck.nil?
     end
 
     # Returns whether the container exists.
     def exists? : Bool
-      return false unless @container_id
-      api.containers.inspect(@container_id.not_nil!)
+      id = @container_id || return false
+      api.containers.inspect(id)
       true
     rescue Docr::Errors::DockerAPIError
       false
@@ -516,24 +526,23 @@ module Testcontainers
 
     # Returns the container's full inspect data.
     def info : Docr::Types::ContainerInspectResponse
-      raise ContainerNotStartedError.new unless @container_id
-      api.containers.inspect(@container_id.not_nil!)
+      api.containers.inspect(require_container_id)
     rescue ex : Docr::Errors::DockerAPIError
       raise ConnectionError.new("Docker API error: #{ex.message}")
     end
 
     # Returns the container's host address.
     def host : String
-      raise ContainerNotStartedError.new unless @container_id
+      require_container_id
       DockerClient.host
     end
 
     # Returns the mapped host port for the given container port.
     def mapped_port(port : Int32 | String) : Int32
-      raise ContainerNotStartedError.new unless @container_id
+      id = require_container_id
       normalized = normalize_port(port)
 
-      inspect_data = api.containers.inspect(@container_id.not_nil!)
+      inspect_data = api.containers.inspect(id)
       ports = inspect_data.network_settings.ports
 
       if bindings = ports[normalized]?
@@ -551,7 +560,7 @@ module Testcontainers
 
     # Returns the first mapped port.
     def first_mapped_port : Int32
-      raise ContainerNotStartedError.new unless @container_id
+      require_container_id
       port = @exposed_ports.keys.first?.try(&.split("/").first.to_i)
       raise PortNotMappedError.new("No exposed ports") unless port
       mapped_port(port)
@@ -559,16 +568,16 @@ module Testcontainers
 
     # Returns the container's logs.
     def logs(stdout : Bool = true, stderr : Bool = true) : String
-      raise ContainerNotStartedError.new unless @container_id
+      id = require_container_id
       output = String::Builder.new
 
       if stdout
-        io = api.containers.logs(@container_id.not_nil!, stdout: true, stderr: false)
+        io = api.containers.logs(id, stdout: true, stderr: false)
         output << strip_docker_log_headers(io.gets_to_end)
       end
 
       if stderr
-        io = api.containers.logs(@container_id.not_nil!, stdout: false, stderr: true)
+        io = api.containers.logs(id, stdout: false, stderr: true)
         output << strip_docker_log_headers(io.gets_to_end)
       end
 
@@ -587,7 +596,7 @@ module Testcontainers
     #
     # Returns the output from the command.
     def exec(cmd : Array(String)) : String
-      raise ContainerNotStartedError.new unless @container_id
+      id = require_container_id
 
       exec_config = Docr::Types::ExecConfig.new(
         attach_stdout: true,
@@ -595,7 +604,7 @@ module Testcontainers
         cmd: cmd,
       )
 
-      exec_response = api.exec.container(@container_id.not_nil!, exec_config)
+      exec_response = api.exec.container(id, exec_config)
       exec_id = exec_response.id
 
       start_config = Docr::Types::ExecStartConfig.new(
@@ -613,7 +622,7 @@ module Testcontainers
 
     # Waits for the container's logs to match the given regex.
     def wait_for_logs(matcher : Regex, timeout : Int32 = 60, interval : Float64 = 0.5) : Bool
-      raise ContainerNotStartedError.new unless @container_id
+      require_container_id
 
       deadline = Time.instant + timeout.seconds
       loop do
@@ -626,7 +635,7 @@ module Testcontainers
 
     # Waits for a TCP port to be open.
     def wait_for_tcp_port(port : Int32, timeout : Int32 = 60, interval : Float64 = 0.5) : Bool
-      raise ContainerNotStartedError.new unless @container_id
+      require_container_id
 
       host_addr = host
       host_port = mapped_port(port)
@@ -647,7 +656,7 @@ module Testcontainers
 
     # Waits for the container to be healthy.
     def wait_for_healthcheck(timeout : Int32 = 60, interval : Float64 = 0.5) : Bool
-      raise ContainerNotStartedError.new unless @container_id
+      require_container_id
       raise HealthcheckNotSupportedError.new unless supports_healthcheck?
 
       deadline = Time.instant + timeout.seconds
@@ -667,7 +676,7 @@ module Testcontainers
       status : Int32 = 200,
       https : Bool = false,
     ) : Bool
-      raise ContainerNotStartedError.new unless @container_id
+      require_container_id
 
       host_addr = host
       host_port = mapped_port(container_port)
@@ -688,6 +697,11 @@ module Testcontainers
     end
 
     # ---- Private helpers ----
+
+    # Returns the container ID, raising if the container has not been started.
+    private def require_container_id : String
+      @container_id || raise NotStartedError.new
+    end
 
     private def add_exposed_port(port : Int32 | String) : Nil
       normalized = normalize_port(port)

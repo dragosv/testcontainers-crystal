@@ -26,7 +26,7 @@ module Testcontainers
     end
 
     # Resets the cached API instance. Useful for testing.
-    def self.reset!
+    def self.reset! : Nil
       @@api = nil
     end
 
