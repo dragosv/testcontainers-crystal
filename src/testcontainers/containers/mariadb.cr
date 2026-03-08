@@ -87,7 +87,7 @@ module Testcontainers
       "#{protocol}://#{user}:#{pwd}@#{host}:#{mapped_port(port)}/#{db}#{query}"
     end
 
-    private def configure_env
+    private def configure_env : Nil
       with_env("MARIADB_ROOT_PASSWORD", @root_password)
       with_env("MARIADB_USER", @username)
       with_env("MARIADB_PASSWORD", @password)

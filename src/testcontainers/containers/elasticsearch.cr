@@ -51,7 +51,7 @@ module Testcontainers
       "#{protocol}://#{host}:#{mapped_port(port)}"
     end
 
-    private def configure_env
+    private def configure_env : Nil
       with_env("discovery.type", "single-node")
       with_env("ELASTIC_PASSWORD", @password)
       with_env("xpack.security.enabled", "false")

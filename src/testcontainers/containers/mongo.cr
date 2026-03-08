@@ -82,7 +82,7 @@ module Testcontainers
       connection_url
     end
 
-    private def configure_env
+    private def configure_env : Nil
       if user = @username
         with_env("MONGO_INITDB_ROOT_USERNAME", user)
       end

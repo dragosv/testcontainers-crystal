@@ -83,7 +83,7 @@ module Testcontainers
       "http://#{host}:#{mapped_port(RABBITMQ_MANAGEMENT_PORT)}"
     end
 
-    private def configure_env
+    private def configure_env : Nil
       with_env("RABBITMQ_DEFAULT_USER", @username)
       with_env("RABBITMQ_DEFAULT_PASS", @password)
       with_env("RABBITMQ_DEFAULT_VHOST", @vhost)

@@ -14,6 +14,8 @@ module Testcontainers
   # network.remove
   # ```
   class Network
+    Log = Testcontainers::Log.for("network")
+
     DEFAULT_DRIVER = "bridge"
 
     getter name : String
@@ -29,6 +31,15 @@ module Testcontainers
       @labels = DockerClient.default_labels
     end
 
+    # Provides a concise string representation for debugging.
+    def inspect(io : IO) : Nil
+      io << "#<" << self.class << " name=" << @name
+      if id = @network_id
+        io << " id=" << id
+      end
+      io << ">"
+    end
+
     # Creates the Docker network (idempotent).
     def create! : self
       return self if @network_id
@@ -42,13 +53,13 @@ module Testcontainers
 
       response = DockerClient.api.networks.create(config)
       @network_id = response.id
-      Testcontainers.logger.info { "Created network: #{@name} (#{@network_id})" }
+      Log.info { "Created network: #{@name} (#{@network_id})" }
       self
     rescue ex : Docr::Errors::DockerAPIError
       if ex.message.try(&.includes?("already exists"))
-        raise NetworkAlreadyExistsError.new("Network '#{@name}' already exists: #{ex.message}")
+        raise AlreadyExistsError.new("Network '#{@name}' already exists: #{ex.message}")
       end
-      raise NetworkError.new("Failed to create network: #{ex.message}")
+      raise Error.new("Failed to create network: #{ex.message}")
     end
 
     # Returns whether the network has been created.
@@ -58,20 +69,20 @@ module Testcontainers
 
     # Returns network information from Docker.
     def info : Docr::Types::Network
-      raise NetworkError.new("Network has not been created") unless @network_id
-      DockerClient.api.networks.inspect(@network_id.not_nil!)
+      id = @network_id || raise Error.new("Network has not been created")
+      DockerClient.api.networks.inspect(id)
     end
 
     # Removes/deletes the network.
     def remove : self
       if id = @network_id
-        Testcontainers.logger.info { "Removing network: #{@name}" }
+        Log.info { "Removing network: #{@name}" }
         DockerClient.api.networks.delete(id)
         @network_id = nil
       end
       self
     rescue ex : Docr::Errors::DockerAPIError
-      raise NetworkError.new("Failed to remove network: #{ex.message}")
+      raise Error.new("Failed to remove network: #{ex.message}")
     end
 
     # Alias for remove.
