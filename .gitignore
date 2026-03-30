@@ -5,4 +5,4 @@
 /.idea/
 
 # Libraries don't need lockfile
-# shard.lock
+shard.lock
