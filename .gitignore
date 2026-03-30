@@ -6,3 +6,4 @@
 
 # Libraries don't need lockfile
 shard.lock
+**/.DS_Store
