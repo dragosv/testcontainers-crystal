@@ -3,6 +3,7 @@
 /.shards/
 *.dwarf
 /.idea/
+.DS_Store
 
 # Libraries don't need lockfile
 shard.lock
