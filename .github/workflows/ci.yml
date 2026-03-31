@@ -81,7 +81,7 @@ jobs:
       run: docker info
 
     - name: Run integration tests
-      run: crystal spec -Dintegration --order random
+      run: crystal spec spec/integration_spec.cr -Dintegration --order random
 
   # Code coverage with kcov
   coverage:
